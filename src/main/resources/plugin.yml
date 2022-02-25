@@ -1,0 +1,21 @@
+name: AstralItems
+version: 0.1
+author: Allymonies
+main: io.astralforge.astralitems.AstralItems
+depend: [NBTAPI]
+api-version: 1.18
+website: astralforge.io
+commands:
+  giveai:
+    description: Give Astral Item
+    usage: /giveai <item id> [amount]
+    permission: astralitems.give
+permissions:
+  astralitems.give:
+    default: false
+    description: Allows usage of /giveai
+  astralitems.*:
+    default: op
+    description: Allows access to every AstralItems command.
+    children:
+      astralitems.give: true

@@ -3,7 +3,6 @@ package io.astralforge.astralitems;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -11,20 +10,49 @@ import org.bukkit.inventory.ItemStack;
 import de.tr7zw.nbtapi.NBTCompound;
 import de.tr7zw.nbtapi.NBTItem;
 import de.tr7zw.nbtapi.NBTList;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NonNull;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.chat.ComponentSerializer;
 
+@Data
+@Builder
 public class AstralItemSpec {
 
+    public static final class AstralItemSpecBuilder {
+        private String displayName;
+
+        public AstralItemSpecBuilder displayName(String displayName) {
+            if (displayName.charAt(0) != '[' && displayName.charAt(0) != '{') {
+                BaseComponent[] displayNameComponents = new ComponentBuilder(displayName).italic(false).color(ChatColor.WHITE).create();
+                displayName = baseComponentsToString(displayNameComponents);
+            }
+            this.displayName = displayName;
+            return this;
+        }
+
+        public AstralItemSpecBuilder displayName(BaseComponent[] displayName) {
+            this.displayName = baseComponentsToString(displayName);
+            return this;
+        }
+    }
+
+    @NonNull
     public final NamespacedKey id;
+    @NonNull
     public final Material material;
+    @NonNull
     public final String displayName;
 
     /* Specific item attributes */
+    @Builder.Default
     private Boolean vanillaCraftable = false;
+    @Builder.Default
     private Boolean renamable = false;
+    @Builder.Default
     private BaseComponent[][] defaultLore = null;
     //Integer burnTime = null;
 
@@ -41,20 +69,6 @@ public class AstralItemSpec {
         }
         sb.append("]");
         return sb.toString();
-    }
-
-    public AstralItemSpec(NamespacedKey id, Material material, BaseComponent[] displayName) {
-        this(id, material, baseComponentsToString(displayName));
-    }
-
-    public AstralItemSpec(NamespacedKey id, Material material, String displayName) {
-        if (displayName.charAt(0) != '[' && displayName.charAt(0) != '{') {
-            BaseComponent[] displayNameComponents = new ComponentBuilder(displayName).italic(false).color(ChatColor.WHITE).create();
-            displayName = baseComponentsToString(displayNameComponents);
-        }
-        this.id = id;
-        this.material = material;
-        this.displayName = displayName;
     }
 
     public ItemStack createItemStack(int amount) {
@@ -81,13 +95,11 @@ public class AstralItemSpec {
     }
 
     public boolean isRenamed(ItemStack item) {
-        Bukkit.getServer().getLogger().info("isRenamed");
         NBTItem nbti = new NBTItem(item);
         if (!nbti.hasKey("display")) return true;
         NBTCompound display = nbti.getCompound("display");
 
         if (!display.hasKey("Name")) return true;
-        Bukkit.getServer().getLogger().info("isRenamed = " + ((Boolean) !display.getString("Name").equals(displayName)).toString());
         return !display.getString("Name").equals(displayName);
     }
 
@@ -132,61 +144,4 @@ public class AstralItemSpec {
     public ItemStack createItemStack() {
         return createItemStack(1);
     }
-
-    public NamespacedKey getId() {
-        return this.id;
-    }
-
-
-    public Material getMaterial() {
-        return this.material;
-    }
-
-
-    public Boolean isVanillaCraftable() {
-        return this.vanillaCraftable;
-    }
-
-    public Boolean getVanillaCraftable() {
-        return this.vanillaCraftable;
-    }
-
-    public void setVanillaCraftable(Boolean vanillaCraftable) {
-        this.vanillaCraftable = vanillaCraftable;
-    }
-
-
-    public String getDisplayName() {
-        return this.displayName;
-    }
-
-
-    public Boolean isRenamable() {
-        return this.renamable;
-    }
-
-    public Boolean getRenamable() {
-        return this.renamable;
-    }
-
-    public void setRenamable(Boolean renamable) {
-        this.renamable = renamable;
-    }
-
-    public BaseComponent[][] getDefaultLore() {
-        return this.defaultLore;
-    }
-
-    public void setDefaultLore(BaseComponent[][] defaultLore) {
-        this.defaultLore = defaultLore;
-    }
-
-    /*public Integer getBurnTime() {
-        return this.burnTime;
-    }
-
-    public void setBurnTime(Integer burnTime) {
-        this.burnTime = burnTime;
-    }*/
-
 }

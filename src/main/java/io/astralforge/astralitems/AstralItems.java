@@ -1,28 +1,25 @@
 package io.astralforge.astralitems;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.inventory.ItemStack;
-//import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
-
-import de.tr7zw.nbtapi.NBTItem;
-import io.astralforge.astralitems.block.AbstractAstralBlockSpec;
-import io.astralforge.astralitems.block.AstralBasicBlockSpec;
-import io.astralforge.astralitems.block.BasicBlockEventListener;
-import io.astralforge.astralitems.block.BasicBlockStateManager;
-import net.md_5.bungee.api.ChatColor;
-import net.md_5.bungee.api.chat.BaseComponent;
-import net.md_5.bungee.api.chat.ComponentBuilder;
-
 import java.util.HashMap;
 import java.util.Map;
 
 import org.bstats.bukkit.Metrics;
+import org.bukkit.NamespacedKey;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import de.tr7zw.nbtapi.NBTItem;
+import io.astralforge.astralitems.block.AbstractAstralBlockSpec;
+import io.astralforge.astralitems.block.AstralPlaceholderBlockSpec;
+import io.astralforge.astralitems.block.BasicBlockEventListener;
+import io.astralforge.astralitems.block.BasicBlockStateManager;
+import io.astralforge.astralitems.block.PurgePlaceholderCommand;
 
 public class AstralItems extends JavaPlugin {
 
     private final Map<NamespacedKey, AstralItemSpec> items = new HashMap<>();
     private final Map<NamespacedKey, AbstractAstralBlockSpec> blocks = new HashMap<>();
+
+    private boolean pendingHydrate = false;
 
     private BasicBlockStateManager basicBlockStateManager;
 
@@ -33,8 +30,6 @@ public class AstralItems extends JavaPlugin {
 
         //Metrics metrics = new Metrics(this, pluginId);
         new Metrics(this, pluginId);
-
-        addTestItems();
 
         basicBlockStateManager = new BasicBlockStateManager(this);
 
@@ -47,7 +42,11 @@ public class AstralItems extends JavaPlugin {
         GiveCommand giveCommand = new GiveCommand(this);
         getCommand("giveai").setExecutor(giveCommand);
 
+        PurgePlaceholderCommand purgePlaceholderCommand = new PurgePlaceholderCommand(basicBlockStateManager);
+        getCommand("purgeplaceholder").setExecutor(purgePlaceholderCommand);
+
         //FileConfiguration config = this.getConfig();
+        hydrate();
         getLogger().info("AstralItems running!");
         //Fired when the server enables the plugin
         /*CommandPK commandPK = new CommandPK(data, this);
@@ -62,31 +61,31 @@ public class AstralItems extends JavaPlugin {
         //Fired when the server stops and disables all plugins
     }
 
-    public void addTestItems() {
-        NamespacedKey gayCrystalId = new NamespacedKey(this, "gay_crystal");
-        AstralItemSpec gayCrystal = new AstralItemSpec(gayCrystalId, Material.NETHER_STAR, "Gay Crystal");
-        items.put(gayCrystalId, gayCrystal);
+    private void hydrate() {
+        basicBlockStateManager.refreshTickCache();
+    }
 
-        NamespacedKey lesbianIngotId = new NamespacedKey(this, "lesbian_ingot");
-        BaseComponent[] lesbianIngotName = new ComponentBuilder("Lesbian Ingot").italic(false).bold(true).color(ChatColor.AQUA).create();
-        AstralItemSpec lesbianIngot = new AstralItemSpec(lesbianIngotId, Material.NETHER_BRICK, lesbianIngotName);
-        BaseComponent[][] lesbianIngotLore = {new ComponentBuilder("The gayest ingot around").italic(false).bold(true).color(ChatColor.RED).create()};
-        lesbianIngot.setDefaultLore(lesbianIngotLore);
-        lesbianIngot.setRenamable(true);
-        addItem(lesbianIngot);
-
-        // Block
-        NamespacedKey gayBlockId = new NamespacedKey(this, "gay_block");
-        AstralItemSpec gayBlockItem = new AstralItemSpec(gayBlockId, Material.DIAMOND_BLOCK, "Gay Block");
-        AstralBasicBlockSpec gayBlock = new AstralBasicBlockSpec(gayBlockItem);
-        addBlock(gayBlock);
+    private void scheduleHydrate() {
+        if (!pendingHydrate) {
+            pendingHydrate = true;
+            getServer().getScheduler().runTaskLater(this, () -> {
+                pendingHydrate = false;
+                hydrate();
+            }, 1);
+        }
     }
 
     public void addItem(AstralItemSpec item) {
+        if (items.containsKey(item.getId())) {
+            scheduleHydrate();
+        }
         items.put(item.getId(), item);
     }
 
     public void addBlock(AbstractAstralBlockSpec block) {
+        if (blocks.containsKey(block.itemSpec.getId())) {
+            scheduleHydrate();
+        }
         items.put(block.itemSpec.getId(), block.itemSpec);
         blocks.put(block.itemSpec.getId(), block);
     }
@@ -97,28 +96,62 @@ public class AstralItems extends JavaPlugin {
         return nbti.hasKey("astral_id");
     }
 
+    public boolean isAstralItem(NamespacedKey id) {
+        return items.containsKey(id);
+    }
+
+    public boolean isAstralBlock(NamespacedKey id) {
+        return blocks.containsKey(id);
+    }
+
+    private AstralPlaceholderItemSpec createPlaceholderItem(NamespacedKey id) {
+        AstralPlaceholderItemSpec placeholderItem = new AstralPlaceholderItemSpec(id);
+        items.put(placeholderItem.getId(), placeholderItem);
+        return placeholderItem;
+    }
+
+    private AstralPlaceholderBlockSpec createPlaceholderBlock(NamespacedKey id, AstralItemSpec itemSpec) {
+        AstralPlaceholderBlockSpec blockSpec = AstralPlaceholderBlockSpec.builder()
+            .itemSpec(itemSpec)
+            .build();
+        blocks.put(blockSpec.itemSpec.getId(), blockSpec);
+        return blockSpec;
+    }
+
     public AstralItemSpec getAstralItem(ItemStack item) {
         if (!isAstralItem(item)) return null;
         NBTItem nbti = new NBTItem(item);
         String id = nbti.getString("astral_id");
-        return items.get(NamespacedKey.fromString(id));
+        AstralItemSpec astralItemSpec = items.get(NamespacedKey.fromString(id));
+        if (astralItemSpec == null) {
+            astralItemSpec = createPlaceholderItem(NamespacedKey.fromString(id));
+        }
+        return astralItemSpec;
     }
 
     public AstralItemSpec getAstralItem(NamespacedKey id) {
         if (items.containsKey(id)) return items.get(id);
-        return null;
+        return createPlaceholderItem(id);
     }
 
     public AbstractAstralBlockSpec getAstralBlock(ItemStack item) {
         if (!isAstralItem(item)) return null;
         NBTItem nbti = new NBTItem(item);
         String id = nbti.getString("astral_id");
+        AbstractAstralBlockSpec astralBlockSpec = blocks.get(NamespacedKey.fromString(id));
+        if (astralBlockSpec == null) {
+            AstralItemSpec itemSpec = getAstralItem(item);
+            if (itemSpec instanceof AstralPlaceholderItemSpec) {
+                astralBlockSpec = createPlaceholderBlock(NamespacedKey.fromString(id), itemSpec);
+            }
+        }
+
         return blocks.get(NamespacedKey.fromString(id));
     }
 
     public AbstractAstralBlockSpec getAstralBlock(NamespacedKey id) {
         if (blocks.containsKey(id)) return blocks.get(id);
-        return null;
+        return createPlaceholderBlock(id, getAstralItem(id));
     }
 
     public Map<NamespacedKey,AstralItemSpec> getItems() {

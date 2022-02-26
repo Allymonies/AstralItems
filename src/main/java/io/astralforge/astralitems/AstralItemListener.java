@@ -5,14 +5,12 @@ import java.util.List;
 
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDispenseEvent;
-import org.bukkit.event.block.BlockFromToEvent;
-import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.enchantment.EnchantItemEvent;
 import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
@@ -27,7 +25,6 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
-import org.bukkit.event.Event;
 import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
@@ -35,6 +32,7 @@ import org.bukkit.inventory.SmithingInventory;
 import org.bukkit.inventory.StonecutterInventory;
 
 import io.astralforge.astralitems.block.AbstractAstralBlockSpec;
+import io.astralforge.astralitems.block.AstralPlaceholderBlockSpec;
 
 public class AstralItemListener implements Listener {
 
@@ -46,15 +44,19 @@ public class AstralItemListener implements Listener {
     boolean isVanillaCraftable(ItemStack item) {
         AstralItemSpec astralItem = plugin.getAstralItem(item);
         if (astralItem == null) return true;
-        return astralItem.isVanillaCraftable();
+        return astralItem.getVanillaCraftable();
     }
 
     boolean isPlacable(ItemStack item) {
         AstralItemSpec astralItem = plugin.getAstralItem(item);
         if (astralItem == null) return true;
 
-        AbstractAstralBlockSpec astralBlock = plugin.getAstralBlock(item);
-        return astralBlock != null;
+        if (plugin.isAstralBlock(astralItem.id)) {
+            AbstractAstralBlockSpec astralBlock = plugin.getAstralBlock(item);
+            return astralBlock != null && !(astralBlock instanceof AstralPlaceholderBlockSpec);
+        } else {
+            return false;
+        }
     }
 
     public AstralItemListener(AstralItems plugin) {
@@ -148,11 +150,10 @@ public class AstralItemListener implements Listener {
         if (inventory.getItem(1) == null) {
             AstralItemSpec astralItem = plugin.getAstralItem(inventory.getItem(0));
             ItemStack result = event.getResult();
-            if (astralItem != null && !astralItem.isRenamable()) {
+            if (astralItem != null && !astralItem.getRenamable()) {
                 event.setResult(null);
             } else if (astralItem != null && result != null) {
                 ItemStack newResult = astralItem.setLore(result, astralItem.getLore(result));
-                plugin.getLogger().info("Setting resolt with lore");
                 event.setResult(newResult);
             }
         } else if (!isVanillaCraftable(inventory.getItem(0)) || !isVanillaCraftable(inventory.getItem(1))) {
@@ -186,7 +187,7 @@ public class AstralItemListener implements Listener {
                     AstralItemSpec astralItem = plugin.getAstralItem(anvilInventory.getItem(0));
 
                     ItemStack result = event.getCurrentItem();
-                    if (astralItem != null && !astralItem.isRenamable()) {
+                    if (astralItem != null && !astralItem.getRenamable()) {
                         event.setCancelled(true);
                     } else if (astralItem != null && result != null) {
                         ItemStack newResult = astralItem.setLore(result, astralItem.getLore(result));

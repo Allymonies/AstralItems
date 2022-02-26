@@ -46,7 +46,7 @@ public class GiveCommand implements CommandExecutor, TabCompleter {
 
         AstralItemSpec item = plugin.getAstralItem(id);
 
-        if (item == null) {
+        if (item instanceof AstralPlaceholderItemSpec) {
             BaseComponent[] result = new ComponentBuilder("Unknown Item " + args[0]).color(ChatColor.RED).create();
             sender.spigot().sendMessage(result);
             return true;
@@ -70,7 +70,17 @@ public class GiveCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return plugin.getItems().keySet().stream().map(NamespacedKey::toString).filter(s -> s.startsWith(args[0]) || s.split(":")[1].startsWith(args[0])).collect(java.util.stream.Collectors.toList());
+            return plugin
+                .getItems()
+                .entrySet()
+                .stream()
+                .filter((e) -> {
+                    return !(e.getValue() instanceof AstralPlaceholderItemSpec) 
+                        && (e.getKey().toString().startsWith(args[0])
+                            || e.getKey().toString().split(":")[1].startsWith(args[0]));
+                })
+                .map(e -> e.getKey().toString())
+                .collect(java.util.stream.Collectors.toList());
         }
         return null;
     }

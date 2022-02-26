@@ -44,10 +44,16 @@ public class GiveCommand implements CommandExecutor, TabCompleter {
 
         NamespacedKey id = NamespacedKey.fromString(args[0], plugin);
 
+        if (!plugin.isAstralItem(id)) {
+            BaseComponent[] result = new ComponentBuilder("Item " + args[0] + " is not an Astral Item").color(ChatColor.RED).create();
+            sender.spigot().sendMessage(result);
+            return true;
+        }
+
         AstralItemSpec item = plugin.getAstralItem(id);
 
         if (item instanceof AstralPlaceholderItemSpec) {
-            BaseComponent[] result = new ComponentBuilder("Unknown Item " + args[0]).color(ChatColor.RED).create();
+            BaseComponent[] result = new ComponentBuilder("Item " + args[0] + " is unregistered, check that the plugin is active").color(ChatColor.RED).create();
             sender.spigot().sendMessage(result);
             return true;
         }

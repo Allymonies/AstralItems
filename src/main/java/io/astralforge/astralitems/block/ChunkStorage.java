@@ -1,38 +1,33 @@
 package io.astralforge.astralitems.block;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 public class ChunkStorage {
     private Plugin plugin;
-    private NamespacedKey blocksKey;
+    private final String storageKey;
 
     public ChunkStorage(Plugin plugin) {
         this.plugin = plugin;
-        this.blocksKey = new NamespacedKey(plugin, "basic-blocks");
+        storageKey = "basic-blocks-";
     }
 
     public Optional<ChunkAstralBlock> getMeta(Chunk chunk, int worldX, int worldY, int worldZ) {
         ChunkLocation chunkLocation = worldToChunk(worldX, worldY, worldZ);
 
         PersistentDataContainer container = chunk.getPersistentDataContainer();
-        plugin.getLogger().info("container: " + container.getKeys());
-        PersistentDataContainer blocks = container.get(blocksKey, PersistentDataType.TAG_CONTAINER);
-        if (blocks == null) {
-            return Optional.empty();
-        }
-
-        plugin.getLogger().info("blocks: " + blocks.getKeys());
 
         try {
-            ChunkAstralBlock block = blocks.get(
-                new NamespacedKey(plugin, chunkLocation.toString()), 
+            ChunkAstralBlock block = container.get(
+                new NamespacedKey(plugin, storageKey + chunkLocation.toString()), 
                 ChunkAstralBlock.Serial.get()
             );
 
@@ -52,32 +47,20 @@ public class ChunkStorage {
         ChunkLocation chunkLocation = worldToChunk(worldX, worldY, worldZ);
 
         PersistentDataContainer container = chunk.getPersistentDataContainer();
-        PersistentDataContainer blocks = container.get(blocksKey, PersistentDataType.TAG_CONTAINER);
-        if (blocks == null) {
-            blocks = container.getAdapterContext().newPersistentDataContainer();
-        }
 
-        blocks.set(
-            new NamespacedKey(plugin, chunkLocation.toString()), 
+        container.set(
+            new NamespacedKey(plugin, storageKey + chunkLocation.toString()), 
             ChunkAstralBlock.Serial.get(), 
             blockMeta
         );
-
-        // Flush
-        container.set(blocksKey, PersistentDataType.TAG_CONTAINER, blocks);
     }
 
     public void removeMeta(Chunk chunk, int worldX, int worldY, int worldZ) {
         ChunkLocation chunkLocation = worldToChunk(worldX, worldY, worldZ);
 
         PersistentDataContainer container = chunk.getPersistentDataContainer();
-        PersistentDataContainer blocks = container.get(blocksKey, PersistentDataType.TAG_CONTAINER);
-        if (blocks == null) {
-            return;
-        }
 
-        blocks.remove(new NamespacedKey(plugin, chunkLocation.toString()));
-        container.set(blocksKey, PersistentDataType.TAG_CONTAINER, blocks);
+        container.remove(new NamespacedKey(plugin, storageKey + chunkLocation.toString()));
     }
 
 
@@ -103,5 +86,64 @@ public class ChunkStorage {
             y,
             z & 0xF
         );
+    }
+
+    public static final class ChunkAstralBlockLocation {
+        public final ChunkAstralBlock chunkAstralBlock;
+        public final Location blockLocation;
+
+        public ChunkAstralBlockLocation(ChunkAstralBlock chunkAstralBlock, Location blockLocation) {
+            this.chunkAstralBlock = chunkAstralBlock;
+            this.blockLocation = blockLocation;
+        }
+    }
+
+    public List<ChunkAstralBlockLocation> getChunkAstralBlocks(Chunk chunk) {
+        int chunkCornerX = chunk.getX() << 4;
+        int chunkCornerZ = chunk.getZ() << 4;
+        List<ChunkAstralBlockLocation> blocks = new ArrayList<>();
+
+        //Bukkit.getLogger().info("Getting all chunk astral blocks for chunk " + chunk.getX() + "," + chunk.getZ());
+
+        PersistentDataContainer container = chunk.getPersistentDataContainer();
+        
+        if (container.isEmpty()) {
+            //Bukkit.getLogger().info("Container for this chunk is empty!");
+            return blocks;
+        }
+
+        for (NamespacedKey key : container.getKeys()) {
+
+            if (key.getNamespace().equalsIgnoreCase(plugin.getName()) && key.getKey().startsWith(storageKey)) {
+                ChunkAstralBlock block = container.get(
+                    key, 
+                    ChunkAstralBlock.Serial.get()
+                );
+
+                String[] keyParts = key.getKey().substring(storageKey.length()).split("\\.");
+
+                if (keyParts.length != 3) {
+                    Bukkit.getLogger().warning("Invalid key " + key.getKey() + " in chunk " + chunk.getX() + "," + chunk.getZ());
+                    Bukkit.getLogger().warning( key.getKey().substring(storageKey.length()) + " " + keyParts.length);
+                    continue;
+                }
+
+                try {
+                    Location blockLocation = new Location(
+                        chunk.getWorld(),
+                        Integer.parseInt(keyParts[0]) + chunkCornerX,
+                        Integer.parseInt(keyParts[1]),
+                        Integer.parseInt(keyParts[2]) + chunkCornerZ
+                        
+                    );
+                    blocks.add(new ChunkAstralBlockLocation(block, blockLocation));
+                } catch (NumberFormatException e) {
+                    Bukkit.getLogger().warning("Invalid key " + key.getKey() + " in chunk " + chunk.getX() + "," + chunk.getZ());
+                    continue;
+                }
+            }
+        }
+
+        return blocks;
     }
 }

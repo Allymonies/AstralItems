@@ -34,6 +34,8 @@ public class AstralItems extends JavaPlugin {
         //Metrics metrics = new Metrics(this, pluginId);
         new Metrics(this, pluginId);
 
+        addTestItems();
+
         basicBlockStateManager = new BasicBlockStateManager(this);
 
         AstralItemListener itemEventListener = new AstralItemListener(this);
@@ -45,7 +47,22 @@ public class AstralItems extends JavaPlugin {
         GiveCommand giveCommand = new GiveCommand(this);
         getCommand("giveai").setExecutor(giveCommand);
 
+        //FileConfiguration config = this.getConfig();
+        getLogger().info("AstralItems running!");
+        //Fired when the server enables the plugin
+        /*CommandPK commandPK = new CommandPK(data, this);
+        this.getCommand("pk").setExecutor(commandPK);
+        this.getCommand("pk").setTabCompleter(commandPK);
+        proxyListener = new ProxyListener(data, config, chat, discord);
+        getServer().getPluginManager().registerEvents(proxyListener, this);*/
+    }
 
+    @Override
+    public void onDisable() {
+        //Fired when the server stops and disables all plugins
+    }
+
+    public void addTestItems() {
         NamespacedKey gayCrystalId = new NamespacedKey(this, "gay_crystal");
         AstralItemSpec gayCrystal = new AstralItemSpec(gayCrystalId, Material.NETHER_STAR, "Gay Crystal");
         items.put(gayCrystalId, gayCrystal);
@@ -63,20 +80,6 @@ public class AstralItems extends JavaPlugin {
         AstralItemSpec gayBlockItem = new AstralItemSpec(gayBlockId, Material.DIAMOND_BLOCK, "Gay Block");
         AstralBasicBlockSpec gayBlock = new AstralBasicBlockSpec(gayBlockItem);
         addBlock(gayBlock);
-
-        //FileConfiguration config = this.getConfig();
-        getLogger().info("AstralItems running!");
-        //Fired when the server enables the plugin
-        /*CommandPK commandPK = new CommandPK(data, this);
-        this.getCommand("pk").setExecutor(commandPK);
-        this.getCommand("pk").setTabCompleter(commandPK);
-        proxyListener = new ProxyListener(data, config, chat, discord);
-        getServer().getPluginManager().registerEvents(proxyListener, this);*/
-    }
-
-    @Override
-    public void onDisable() {
-        //Fired when the server stops and disables all plugins
     }
 
     public void addItem(AstralItemSpec item) {

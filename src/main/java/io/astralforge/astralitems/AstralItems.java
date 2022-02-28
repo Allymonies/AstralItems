@@ -3,6 +3,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.bstats.bukkit.Metrics;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -13,6 +15,9 @@ import io.astralforge.astralitems.block.AstralPlaceholderBlockSpec;
 import io.astralforge.astralitems.block.BasicBlockEventListener;
 import io.astralforge.astralitems.block.BasicBlockStateManager;
 import io.astralforge.astralitems.block.PurgePlaceholderCommand;
+import io.astralforge.astralitems.recipe.AstralRecipeEvaluator;
+import io.astralforge.astralitems.recipe.CraftingListener;
+import lombok.Getter;
 
 public class AstralItems extends JavaPlugin {
 
@@ -22,6 +27,14 @@ public class AstralItems extends JavaPlugin {
     private boolean pendingHydrate = false;
 
     private BasicBlockStateManager basicBlockStateManager;
+    
+    @Getter
+    private AstralRecipeEvaluator recipeEvaluator;
+
+    public static AstralItems getInstance() {
+        return Bukkit.getPluginManager().getPlugin("AstralItems") instanceof AstralItems 
+            ? (AstralItems) Bukkit.getPluginManager().getPlugin("AstralItems") : null;
+    }
 
     @Override
     public void onEnable() {
@@ -33,8 +46,13 @@ public class AstralItems extends JavaPlugin {
 
         basicBlockStateManager = new BasicBlockStateManager(this);
 
+        recipeEvaluator = new AstralRecipeEvaluator();
+
         AstralItemListener itemEventListener = new AstralItemListener(this);
         getServer().getPluginManager().registerEvents(itemEventListener, this);
+
+        CraftingListener craftingListener = new CraftingListener(this);
+        getServer().getPluginManager().registerEvents(craftingListener, this);
 
         BasicBlockEventListener blockEventListener = new BasicBlockEventListener(this, basicBlockStateManager);
         getServer().getPluginManager().registerEvents(blockEventListener, this);
@@ -59,6 +77,7 @@ public class AstralItems extends JavaPlugin {
     @Override
     public void onDisable() {
         //Fired when the server stops and disables all plugins
+        recipeEvaluator.unregisterAllRecipes();
     }
 
     private void hydrate() {
@@ -91,7 +110,7 @@ public class AstralItems extends JavaPlugin {
     }
 
     public boolean isAstralItem(ItemStack item) {
-        if (item == null) return false;
+        if (item == null || item.getType() == Material.AIR) return false;
         NBTItem nbti = new NBTItem(item);
         return nbti.hasKey("astral_id");
     }

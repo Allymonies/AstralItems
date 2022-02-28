@@ -3,6 +3,7 @@ package io.astralforge.astralitems;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -20,7 +21,7 @@ import net.md_5.bungee.chat.ComponentSerializer;
 
 @Data
 @Builder
-public class AstralItemSpec {
+public class AstralItemSpec implements Keyed {
 
     public static final class AstralItemSpecBuilder {
         private String displayName;
@@ -143,5 +144,16 @@ public class AstralItemSpec {
 
     public ItemStack createItemStack() {
         return createItemStack(1);
+    }
+
+    @Override
+    public NamespacedKey getKey() {
+        return id;
+    }
+
+    public static boolean isVanillaCraftable(AstralItems plugin, ItemStack item) {
+        AstralItemSpec astralItem = plugin.getAstralItem(item);
+        if (astralItem == null) return true;
+        return astralItem.getVanillaCraftable();
     }
 }

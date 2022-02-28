@@ -15,18 +15,16 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.enchantment.EnchantItemEvent;
 import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
 import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.CraftItemEvent;
+import org.bukkit.event.inventory.FurnaceSmeltEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
-import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.AnvilInventory;
-import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.SmithingInventory;
 import org.bukkit.inventory.StonecutterInventory;
@@ -42,9 +40,7 @@ public class AstralItemListener implements Listener {
     static final List<InventoryType> PROHIBITED_INSERTIONS = Arrays.asList(InventoryType.STONECUTTER, InventoryType.BREWING, InventoryType.SMOKER, InventoryType.GRINDSTONE, InventoryType.LECTERN, InventoryType.BEACON, InventoryType.BLAST_FURNACE, InventoryType.CARTOGRAPHY, InventoryType.LOOM, InventoryType.FURNACE);
 
     boolean isVanillaCraftable(ItemStack item) {
-        AstralItemSpec astralItem = plugin.getAstralItem(item);
-        if (astralItem == null) return true;
-        return astralItem.getVanillaCraftable();
+        return AstralItemSpec.isVanillaCraftable(plugin, item);
     }
 
     boolean isPlacable(ItemStack item) {
@@ -61,26 +57,6 @@ public class AstralItemListener implements Listener {
 
     public AstralItemListener(AstralItems plugin) {
         this.plugin = plugin;
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
-    public void onCraft(CraftItemEvent event) {
-        CraftingInventory craftingTable = event.getInventory();
-        for (ItemStack item : craftingTable.getMatrix()) {
-            if (!isVanillaCraftable(item)) {
-                event.setCancelled(true);
-            }
-        }
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
-    public void onPrepareCraft(PrepareItemCraftEvent event) {
-        CraftingInventory craftingTable = event.getInventory();
-        for (ItemStack item : craftingTable.getMatrix()) {
-            if (!isVanillaCraftable(item)) {
-                craftingTable.setResult(null);
-            }
-        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
@@ -176,8 +152,10 @@ public class AstralItemListener implements Listener {
             }
         }
         if (event.getClickedInventory() != null && PROHIBITED_INSERTIONS.contains(event.getClickedInventory().getType())) {
-            if (!isVanillaCraftable(event.getCursor())) {
-                event.setCancelled(true);
+            if (event.getCursor().getType() != Material.AIR) {
+                if (!isVanillaCraftable(event.getCursor())) {
+                    event.setCancelled(true);
+                }
             }
         }
         if (event.getClickedInventory() instanceof AnvilInventory) {
@@ -238,6 +216,11 @@ public class AstralItemListener implements Listener {
             event.setResult(null);
             //inventory.setItem(3, null);
         }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
+    public void onSmelt(FurnaceSmeltEvent event) {
+        event.setCancelled(true);
     }
 
 }

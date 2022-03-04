@@ -77,6 +77,13 @@ public class BasicBlockStateManager {
         }
     }
 
+    public Optional<AstralBasicBlockSpec> getSpecFromBlock(Block block) {
+        Optional<ChunkAstralBlock> meta = chunkStorage.getMeta(block.getChunk(), block.getX(), block.getY(), block.getZ());
+        return meta.map(chunkAstralBlock ->
+            (AstralBasicBlockSpec) plugin.getAstralBlock(chunkAstralBlock.key)
+        );
+    }
+
     public boolean isPlaceholder(BlockState blockState) {
         Optional<ChunkAstralBlock> chunkBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
         if (chunkBlock.isPresent()) {

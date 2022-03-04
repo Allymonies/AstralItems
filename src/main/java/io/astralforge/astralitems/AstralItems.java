@@ -1,20 +1,18 @@
 package io.astralforge.astralitems;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
+import io.astralforge.astralitems.block.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import de.tr7zw.nbtapi.NBTItem;
-import io.astralforge.astralitems.block.AbstractAstralBlockSpec;
-import io.astralforge.astralitems.block.AstralPlaceholderBlockSpec;
-import io.astralforge.astralitems.block.BasicBlockEventListener;
-import io.astralforge.astralitems.block.BasicBlockStateManager;
-import io.astralforge.astralitems.block.PurgePlaceholderCommand;
 import io.astralforge.astralitems.recipe.AstralRecipeEvaluator;
 import io.astralforge.astralitems.recipe.CraftingListener;
 import lombok.Getter;
@@ -151,6 +149,10 @@ public class AstralItems extends JavaPlugin {
     public AstralItemSpec getAstralItem(NamespacedKey id) {
         if (items.containsKey(id)) return items.get(id);
         return createPlaceholderItem(id);
+    }
+
+    public Optional<AbstractAstralBlockSpec> getAstralBlock(Block block) {
+        return basicBlockStateManager.getSpecFromBlock(block).map(spec -> /* Downcast */ spec);
     }
 
     public AbstractAstralBlockSpec getAstralBlock(ItemStack item) {

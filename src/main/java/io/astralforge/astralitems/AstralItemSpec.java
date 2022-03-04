@@ -2,6 +2,7 @@ package io.astralforge.astralitems;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.bukkit.Keyed;
 import org.bukkit.Material;
@@ -39,6 +40,10 @@ public class AstralItemSpec implements Keyed {
             this.displayName = baseComponentsToString(displayName);
             return this;
         }
+    }
+
+    public void register() {
+        Objects.requireNonNull(AstralItems.getInstance()).addItem(this);
     }
 
     @NonNull

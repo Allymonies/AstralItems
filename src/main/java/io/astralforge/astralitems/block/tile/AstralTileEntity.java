@@ -1,6 +1,7 @@
 package io.astralforge.astralitems.block.tile;
 
 import org.bukkit.Location;
+import org.bukkit.persistence.PersistentDataContainer;
 
 public abstract class AstralTileEntity {
 
@@ -12,6 +13,10 @@ public abstract class AstralTileEntity {
 
   public void onLoad() {}
   public void onUnload() {}
+
+  // TODO: Call these on loading/unloading tile entities
+  public void serialize(PersistentDataContainer container) {}
+  public void deserialize(PersistentDataContainer container) {}
 
   public interface Builder {
     AstralTileEntity build();

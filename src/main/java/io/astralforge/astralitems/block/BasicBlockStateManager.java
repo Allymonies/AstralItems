@@ -40,7 +40,7 @@ public class BasicBlockStateManager {
                     for (AstralTileEntity tile : chunk.values()) {
                         double tickChance = 1;
                         try {
-                            RandomTick ann = tile.getClass().getDeclaredMethod("tick").getAnnotation(RandomTick.class);
+                            RandomTick ann = tile.getClass().getMethod("tick").getAnnotation(RandomTick.class);
                             if (ann != null) {
                                 tickChance = ann.chance();
                             }

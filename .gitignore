@@ -2,4 +2,5 @@
 .apt
 bin/
 target/
+.idea
 *.iml

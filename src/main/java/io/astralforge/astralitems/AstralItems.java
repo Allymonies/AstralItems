@@ -31,8 +31,7 @@ public class AstralItems extends JavaPlugin {
     private AstralRecipeEvaluator recipeEvaluator;
 
     public static AstralItems getInstance() {
-        return Bukkit.getPluginManager().getPlugin("AstralItems") instanceof AstralItems 
-            ? (AstralItems) Bukkit.getPluginManager().getPlugin("AstralItems") : null;
+        return (AstralItems) Bukkit.getPluginManager().getPlugin("AstralItems");
     }
 
     @Override

@@ -22,8 +22,8 @@ abstract public class AbstractAstralBlockSpec {
 //        void tick(Block block, AbstractAstralBlockSpec blockSpec);
 //    }
 
-    public void register() {
-        Objects.requireNonNull(AstralItems.getInstance()).addBlock(this);
+    public void register(AstralItems plugin) {
+        plugin.addBlock(this);
     }
 
 }

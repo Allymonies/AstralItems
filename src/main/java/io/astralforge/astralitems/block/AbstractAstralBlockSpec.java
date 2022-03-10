@@ -1,6 +1,7 @@
 package io.astralforge.astralitems.block;
 
 import io.astralforge.astralitems.AstralItems;
+import io.astralforge.astralitems.block.tile.AstralTileEntity;
 import org.bukkit.block.Block;
 
 import io.astralforge.astralitems.AstralItemSpec;
@@ -13,11 +14,13 @@ import java.util.Objects;
 abstract public class AbstractAstralBlockSpec {
     @NonNull
     public final AstralItemSpec itemSpec;
-    public final TickHandlerInterface tickHandler;
+//    public final TickHandlerInterface tickHandler;
 
-    public interface TickHandlerInterface {
-        void tick(Block block, AbstractAstralBlockSpec blockSpec);
-    }
+    public final AstralTileEntity.Builder tileEntityBuilder;
+
+//    public interface TickHandlerInterface {
+//        void tick(Block block, AbstractAstralBlockSpec blockSpec);
+//    }
 
     public void register() {
         Objects.requireNonNull(AstralItems.getInstance()).addBlock(this);

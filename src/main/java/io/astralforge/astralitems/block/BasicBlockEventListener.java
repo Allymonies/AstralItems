@@ -66,12 +66,12 @@ public class BasicBlockEventListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
     public void onChunkLoad(ChunkLoadEvent event) {
-        basicBlockStateManager.addChunkToTickCache(event.getChunk());
+        basicBlockStateManager.loadChunkTileEntities(event.getChunk());
     }
 
     @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
     public void onChunkUnload(ChunkUnloadEvent event) {
-        basicBlockStateManager.removeChunkFromTickCache(event.getChunk());
+        basicBlockStateManager.unloadChunkTileEntities(event.getChunk());
     }
     
 }

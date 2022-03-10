@@ -1,12 +1,10 @@
 package io.astralforge.astralitems.block;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Map.Entry;
+import java.util.*;
 
+import io.astralforge.astralitems.block.tile.AstralTileEntity;
+import io.astralforge.astralitems.block.tile.RandomTick;
+import io.astralforge.astralitems.mutil.ChunkCoord;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -19,9 +17,12 @@ import io.astralforge.astralitems.AstralItems;
 
 public class BasicBlockStateManager {
 
-    private AstralItems plugin;
-    private ChunkStorage chunkStorage;
-    private Map<Block, AstralBasicBlockSpec> tickCache = new HashMap<>();
+    private final AstralItems plugin;
+    private final ChunkStorage chunkStorage;
+//    private Map<Block, AstralBasicBlockSpec> tickCache = new HashMap<>();
+    private final Map<ChunkCoord, Map<Block, AstralTileEntity>> tileEntities = new HashMap<>();
+
+    private final Random random = new Random(System.currentTimeMillis());
 
     public BasicBlockStateManager(AstralItems plugin) {
         this.plugin = plugin;
@@ -30,41 +31,85 @@ public class BasicBlockStateManager {
         new BukkitRunnable() {
             @Override
             public void run() {
-                for (Entry<Block, AstralBasicBlockSpec> entry : tickCache.entrySet()) {
-                    if (entry.getValue().tickHandler != null) {
-                        entry.getValue().tickHandler.tick(entry.getKey(), entry.getValue());
+//                for (Entry<Block, AstralBasicBlockSpec> entry : tickCache.entrySet()) {
+//                    if (entry.getValue().tickHandler != null) {
+//                        entry.getValue().tickHandler.tick(entry.getKey(), entry.getValue());
+//                    }
+//                }
+                for (Map<Block, AstralTileEntity> chunk : tileEntities.values()) {
+                    for (AstralTileEntity tile : chunk.values()) {
+                        double tickChance = 1;
+                        try {
+                            RandomTick ann = tile.getClass().getDeclaredMethod("tick").getAnnotation(RandomTick.class);
+                            if (ann != null) {
+                                tickChance = ann.chance();
+                            }
+                        } catch (NoSuchMethodException e) {
+                            e.printStackTrace();
+                        }
+
+                        if (tickChance >= 1 || random.nextDouble() < tickChance) {
+                            tile.tick();
+                        }
                     }
                 }
             }
         }.runTaskTimer(plugin, 0, 1);
     }
 
-    public void addToTickCache(Block block, AstralBasicBlockSpec spec) {
-        tickCache.put(block, spec);
+    public AstralTileEntity loadTileEntity(Block block, AstralBasicBlockSpec spec) {
+        if (spec.tileEntityBuilder == null) return null;
+
+        AstralTileEntity tileEntity = spec.tileEntityBuilder.build();
+        tileEntity.setLocation(block.getLocation());
+
+        ChunkCoord coord = ChunkCoord.from(block.getLocation());
+        Map<Block, AstralTileEntity> chunkTileEntities = tileEntities.computeIfAbsent(coord, k -> new HashMap<>());
+        chunkTileEntities.put(block, tileEntity);
+
+        tileEntity.onLoad();
+
+        return tileEntity;
     }
 
-    public void removeFromTickCache(Block block) {
-        tickCache.remove(block);
+    public void unloadTileEntity(Block block) {
+        ChunkCoord coord = ChunkCoord.from(block.getChunk());
+        Map<Block, AstralTileEntity> chunkTileEntities = tileEntities.get(coord);
+        if (chunkTileEntities != null) {
+            AstralTileEntity tile = chunkTileEntities.remove(block);
+            if (tile != null) tile.onUnload();
+        }
     }
+//
+//    public void removeFromTickCache(Block block) {
+//        tickCache.remove(block);
+//    }
 
-    public void addChunkToTickCache(Chunk chunk) {
+    public void loadChunkTileEntities(Chunk chunk) {
         getAstralBlockSpecLocationsFromChunk(chunk).forEach(blockSpecLocation -> {
-            if (blockSpecLocation.blockSpec.tickHandler != null) {
-                tickCache.put(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation), blockSpecLocation.blockSpec);
+//            if (blockSpecLocation.blockSpec.tickHandler != null) {
+//                tickCache.put(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation), blockSpecLocation.blockSpec);
+//            }
+            if (blockSpecLocation.blockSpec.tileEntityBuilder != null) {
+                loadTileEntity(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation), blockSpecLocation.blockSpec);
             }
         });
     }
 
-    public void removeChunkFromTickCache(Chunk chunk) {
+    public void unloadChunkTileEntities(Chunk chunk) {
         getAstralBlockSpecLocationsFromChunk(chunk).forEach(blockSpecLocation -> {
-            tickCache.remove(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation));
+//            tickCache.remove(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation));
+            if (blockSpecLocation.blockSpec.tileEntityBuilder != null) {
+                unloadTileEntity(blockSpecLocation.blockLocation.getBlock());
+            }
         });
     }
 
     public void refreshTickCache() {
         for (World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
-                addChunkToTickCache(chunk);
+                unloadChunkTileEntities(chunk);
+                loadChunkTileEntities(chunk);
             }
         }
     }
@@ -72,8 +117,11 @@ public class BasicBlockStateManager {
     public void processBlockPlacement(AstralBasicBlockSpec spec, Block block) {
         ChunkAstralBlock meta = new ChunkAstralBlock(spec.itemSpec.id, new byte[0]);
         chunkStorage.setMeta(block.getChunk(), block.getX(), block.getY(), block.getZ(), meta);
-        if (spec.tickHandler != null) {
-            tickCache.put(block, spec);
+//        if (spec.tickHandler != null) {
+//            tickCache.put(block, spec);
+//        }
+        if (spec.tileEntityBuilder != null) {
+            loadTileEntity(block, spec);
         }
     }
 
@@ -82,6 +130,16 @@ public class BasicBlockStateManager {
         return meta.map(chunkAstralBlock ->
             (AstralBasicBlockSpec) plugin.getAstralBlock(chunkAstralBlock.key)
         );
+    }
+
+    public Optional<AstralTileEntity> getTileEntityFromBlock(Block block) {
+        ChunkCoord coord = ChunkCoord.from(block.getChunk());
+        Map<Block, AstralTileEntity> chunkEntities = tileEntities.get(coord);
+        if (chunkEntities != null) {
+            return Optional.ofNullable(chunkEntities.get(block));
+        }
+
+        return Optional.empty();
     }
 
     public boolean isPlaceholder(BlockState blockState) {
@@ -99,7 +157,8 @@ public class BasicBlockStateManager {
 
             AbstractAstralBlockSpec spec = plugin.getAstralBlock(chunkBlock.get().key);
             chunkStorage.removeMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
-            tickCache.remove(blockState.getBlock());
+//            tickCache.remove(blockState.getBlock());
+
             return Optional.of(spec);
         }
 
@@ -113,7 +172,8 @@ public class BasicBlockStateManager {
             AbstractAstralBlockSpec spec = plugin.getAstralBlock(chunkBlock.get().key);
             if (spec instanceof AstralBasicBlockSpec) {
                 chunkStorage.removeMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
-                tickCache.remove(blockState.getBlock());
+//                tickCache.remove(blockState.getBlock());
+                unloadTileEntity(blockState.getBlock());
                 return Optional.of(spec);
             } else if (spec instanceof AstralPlaceholderBlockSpec) {
                 return Optional.of(spec);

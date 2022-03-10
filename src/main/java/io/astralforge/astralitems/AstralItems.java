@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import io.astralforge.astralitems.block.*;
+import io.astralforge.astralitems.block.tile.AstralTileEntity;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -173,6 +174,10 @@ public class AstralItems extends JavaPlugin {
     public AbstractAstralBlockSpec getAstralBlock(NamespacedKey id) {
         if (blocks.containsKey(id)) return blocks.get(id);
         return createPlaceholderBlock(id, getAstralItem(id));
+    }
+
+    public Optional<AstralTileEntity> getTileEntity(Block block) {
+        return basicBlockStateManager.getTileEntityFromBlock(block);
     }
 
     public Map<NamespacedKey,AstralItemSpec> getItems() {

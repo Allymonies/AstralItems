@@ -11,6 +11,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import io.astralforge.astralitems.AstralItems;
@@ -57,28 +58,31 @@ public class BasicBlockStateManager {
         }.runTaskTimer(plugin, 0, 1);
     }
 
-    public AstralTileEntity loadTileEntity(Block block, AstralBasicBlockSpec spec) {
-        if (spec.tileEntityBuilder == null) return null;
+    public AstralTileEntity loadTileEntity(Block block, AstralBlock astralBlock ) {
+        if (astralBlock.blockSpec.tileEntityBuilder == null) return null;
 
-        AstralTileEntity tileEntity = spec.tileEntityBuilder.build();
+        AstralTileEntity tileEntity = astralBlock.blockSpec.tileEntityBuilder.build();
         tileEntity.setLocation(block.getLocation());
 
         ChunkCoord coord = ChunkCoord.from(block.getLocation());
         Map<Block, AstralTileEntity> chunkTileEntities = tileEntities.computeIfAbsent(coord, k -> new HashMap<>());
         chunkTileEntities.put(block, tileEntity);
 
-        tileEntity.onLoad();
+        tileEntity.onLoad(astralBlock.data);
 
         return tileEntity;
     }
 
-    public void unloadTileEntity(Block block) {
+    public AstralTileEntity unloadTileEntity(AstralBlock astralBlock) {
+        Block block = astralBlock.blockLocation.getBlock();
         ChunkCoord coord = ChunkCoord.from(block.getChunk());
         Map<Block, AstralTileEntity> chunkTileEntities = tileEntities.get(coord);
         if (chunkTileEntities != null) {
             AstralTileEntity tile = chunkTileEntities.remove(block);
-            if (tile != null) tile.onUnload();
+            if (tile != null) tile.onUnload(astralBlock.data);
+            return tile;
         }
+        return null;
     }
 //
 //    public void removeFromTickCache(Block block) {
@@ -91,18 +95,29 @@ public class BasicBlockStateManager {
 //                tickCache.put(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation), blockSpecLocation.blockSpec);
 //            }
             if (blockSpecLocation.blockSpec.tileEntityBuilder != null) {
-                loadTileEntity(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation), blockSpecLocation.blockSpec);
+                AstralTileEntity tileEntity = loadTileEntity(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation), blockSpecLocation);
             }
         });
     }
 
     public void unloadChunkTileEntities(Chunk chunk) {
-        getAstralBlockSpecLocationsFromChunk(chunk).forEach(blockSpecLocation -> {
+        List<AstralBlock> blocks = getAstralBlockSpecLocationsFromChunk(chunk);
+        blocks.forEach(blockSpecLocation -> {
+//            getAstralBlockSpecLocationsFromChunk(chunk).forEach(blockSpecLocation -> {
 //            tickCache.remove(chunk.getWorld().getBlockAt(blockSpecLocation.blockLocation));
             if (blockSpecLocation.blockSpec.tileEntityBuilder != null) {
-                unloadTileEntity(blockSpecLocation.blockLocation.getBlock());
+                AstralTileEntity tileEntity = unloadTileEntity(blockSpecLocation);
             }
         });
+        chunkStorage.saveChunkAstralBlocks(chunk, blocks);
+    }
+
+    public void unloadAllTileEntities() {
+        for (World world : Bukkit.getWorlds()) {
+            for (Chunk chunk : world.getLoadedChunks()) {
+                unloadChunkTileEntities(chunk);
+            }
+        }
     }
 
     public void refreshTickCache() {
@@ -116,20 +131,21 @@ public class BasicBlockStateManager {
 
     public void processBlockPlacement(AstralBasicBlockSpec spec, Block block) {
         ChunkAstralBlock meta = new ChunkAstralBlock(spec.itemSpec.id, new byte[0]);
-        chunkStorage.setMeta(block.getChunk(), block.getX(), block.getY(), block.getZ(), meta);
-//        if (spec.tickHandler != null) {
-//            tickCache.put(block, spec);
-//        }
+        PersistentDataContainer data = null;
         if (spec.tileEntityBuilder != null) {
-            loadTileEntity(block, spec);
+            data = chunkStorage.getAdapterContext(block.getChunk()).newPersistentDataContainer();
+        }
+        AstralBlock astralBlock = new AstralBlock(spec, block.getLocation(), data);
+        chunkStorage.setMeta(block.getChunk(), astralBlock);
+
+        if (spec.tileEntityBuilder != null) {
+            loadTileEntity(block, astralBlock);
         }
     }
 
-    public Optional<AstralBasicBlockSpec> getSpecFromBlock(Block block) {
-        Optional<ChunkAstralBlock> meta = chunkStorage.getMeta(block.getChunk(), block.getX(), block.getY(), block.getZ());
-        return meta.map(chunkAstralBlock ->
-            (AstralBasicBlockSpec) plugin.getAstralBlock(chunkAstralBlock.key)
-        );
+    public Optional<AbstractAstralBlockSpec> getSpecFromBlock(Block block) {
+        Optional<AstralBlock> astralBlock = chunkStorage.getMeta(block.getChunk(), block.getX(), block.getY(), block.getZ());
+        return astralBlock.map(value -> value.blockSpec);
     }
 
     public Optional<AstralTileEntity> getTileEntityFromBlock(Block block) {
@@ -143,19 +159,19 @@ public class BasicBlockStateManager {
     }
 
     public boolean isPlaceholder(BlockState blockState) {
-        Optional<ChunkAstralBlock> chunkBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
-        if (chunkBlock.isPresent()) {
-            AbstractAstralBlockSpec spec = plugin.getAstralBlock(chunkBlock.get().key);
+        Optional<AstralBlock> astralBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
+        if (astralBlock.isPresent()) {
+            AbstractAstralBlockSpec spec = astralBlock.get().blockSpec;
             return spec instanceof AstralPlaceholderBlockSpec;
         }
         return false;
     }
 
     public Optional<AbstractAstralBlockSpec> forceProcessBlockRemoval(BlockState blockState) {
-        Optional<ChunkAstralBlock> chunkBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
-        if (chunkBlock.isPresent()) {
+        Optional<AstralBlock> astralBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
+        if (astralBlock.isPresent()) {
 
-            AbstractAstralBlockSpec spec = plugin.getAstralBlock(chunkBlock.get().key);
+            AbstractAstralBlockSpec spec = astralBlock.get().blockSpec;
             chunkStorage.removeMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
 //            tickCache.remove(blockState.getBlock());
 
@@ -166,14 +182,14 @@ public class BasicBlockStateManager {
     }
     
     public Optional<AbstractAstralBlockSpec> processBlockRemoval(BlockState blockState) {
-        Optional<ChunkAstralBlock> chunkBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
-        if (chunkBlock.isPresent()) {
+        Optional<AstralBlock> astralBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
+        if (astralBlock.isPresent()) {
 
-            AbstractAstralBlockSpec spec = plugin.getAstralBlock(chunkBlock.get().key);
+            AbstractAstralBlockSpec spec = astralBlock.get().blockSpec;
             if (spec instanceof AstralBasicBlockSpec) {
                 chunkStorage.removeMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
 //                tickCache.remove(blockState.getBlock());
-                unloadTileEntity(blockState.getBlock());
+                unloadTileEntity(astralBlock.get());
                 return Optional.of(spec);
             } else if (spec instanceof AstralPlaceholderBlockSpec) {
                 return Optional.of(spec);
@@ -183,28 +199,24 @@ public class BasicBlockStateManager {
         return Optional.empty();
     }
 
-    public List<AstralBasicBlock> getAstralBlockSpecLocationsFromChunk(Chunk chunk) {
-        List<AstralBasicBlock> blockSpecLocations = new ArrayList<AstralBasicBlock>();
+    public List<AstralBlock> getAstralBlockSpecLocationsFromChunk(Chunk chunk) {
 
-        List<ChunkStorage.ChunkAstralBlockLocation> chunkAstralBlocks = chunkStorage.getChunkAstralBlocks(chunk);
-        for (ChunkStorage.ChunkAstralBlockLocation chunkAstralBlock : chunkAstralBlocks) {
-            AbstractAstralBlockSpec spec = plugin.getAstralBlock(chunkAstralBlock.chunkAstralBlock.key);
-            if (spec instanceof AstralBasicBlockSpec) {
-                blockSpecLocations.add(new AstralBasicBlock((AstralBasicBlockSpec)spec, chunkAstralBlock.blockLocation));
-            }
-        }
+        List<AstralBlock> chunkAstralBlocks = chunkStorage.getChunkAstralBlocks(chunk);
 
-        return blockSpecLocations;
+        return new ArrayList<>(chunkAstralBlocks);
     }
 
-    public static final class AstralBasicBlock {
+    /*public static final class AstralBasicBlock extends AstralBlock {
         public final AstralBasicBlockSpec blockSpec;
+        public final PersistentDataContainer data;
         public final Location blockLocation;
 
-        public AstralBasicBlock(AstralBasicBlockSpec astralBasicBlockSpec, Location blockLocation) {
+        public AstralBasicBlock(AstralBasicBlockSpec astralBasicBlockSpec, Location blockLocation, PersistentDataContainer data) {
+            super(astralBasicBlockSpec, blockLocation, data);
             this.blockSpec = astralBasicBlockSpec;
             this.blockLocation = blockLocation;
+            this.data = data;
         }
-    }
+    }*/
 
 }

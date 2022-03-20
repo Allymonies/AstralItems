@@ -76,6 +76,7 @@ public class AstralItems extends JavaPlugin {
     public void onDisable() {
         //Fired when the server stops and disables all plugins
         recipeEvaluator.unregisterAllRecipes();
+        basicBlockStateManager.unloadAllTileEntities();
     }
 
     private void hydrate() {
@@ -176,6 +177,7 @@ public class AstralItems extends JavaPlugin {
     }
 
     public Optional<AstralTileEntity> getTileEntity(Block block) {
+        if (block == null) return Optional.empty();
         return basicBlockStateManager.getTileEntityFromBlock(block);
     }
 

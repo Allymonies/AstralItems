@@ -2,13 +2,16 @@ package io.astralforge.astralitems.block;
 
 import java.util.Optional;
 
+import io.astralforge.astralitems.block.tile.AstralTileEntity;
 import org.bukkit.GameMode;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.ItemStack;
@@ -62,6 +65,13 @@ public class BasicBlockEventListener implements Listener {
             //plugin.getLogger().info("Block place event for " + event.getBlock().getLocation().toString() + " with " + spec.getClass().getName());
             basicBlockStateManager.processBlockPlacement((AstralBasicBlockSpec) spec, event.getBlock());
         }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
+    public void onInteract(PlayerInteractEvent event) {
+        Block block = event.getClickedBlock();
+        Optional<AstralTileEntity> spec = plugin.getTileEntity(block);
+        spec.ifPresent(astralTileEntity -> astralTileEntity.onInteract(event));
     }
 
     @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.

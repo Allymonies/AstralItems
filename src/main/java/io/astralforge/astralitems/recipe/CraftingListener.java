@@ -1,16 +1,23 @@
 package io.astralforge.astralitems.recipe;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import com.google.common.collect.Lists;
 
 import org.bukkit.Material;
+import org.bukkit.block.Furnace;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockCookEvent;
+import org.bukkit.event.inventory.FurnaceBurnEvent;
+import org.bukkit.event.inventory.FurnaceStartSmeltEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.inventory.CraftingInventory;
+import org.bukkit.inventory.FurnaceInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 
@@ -58,6 +65,50 @@ public class CraftingListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onStartSmelting(FurnaceStartSmeltEvent event) {
+        boolean vanillaCraftable = isVanillaCraftable(event.getSource());
+        Furnace furnace = (Furnace) event.getBlock().getState();
+        ItemStack result = applyAstralRecipes(furnace.getInventory(), vanillaCraftable);
+
+        if (result == null) {
+            // No recipe was found, we need to try and prevent the smelting
+            event.setTotalCookTime(Short.MAX_VALUE);
+        }
+
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onFurnaceBurn(FurnaceBurnEvent event) {
+        Furnace furnace = (Furnace) event.getBlock().getState();
+        FurnaceInventory inventory = furnace.getInventory();
+        boolean vanillaCraftable = isVanillaCraftable(inventory.getSmelting());
+        ItemStack result = applyAstralRecipes(furnace.getInventory(), vanillaCraftable);
+
+        if (result == null) {
+            // No recipe was found, we need to try and prevent the furnace burn
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onBlockCook(BlockCookEvent event) {
+        if (event.getBlock().getState() instanceof Furnace) {
+            Furnace furnace = (Furnace) event.getBlock().getState();
+            FurnaceInventory inventory = furnace.getInventory();
+            boolean vanillaCraftable = isVanillaCraftable(inventory.getSmelting());
+            ItemStack result = applyAstralRecipes(furnace.getInventory(), vanillaCraftable);
+            if (result != null) {
+                plugin.getLogger().info("Block cook for " + result.getType().name());
+                event.setResult(result);
+            } else {
+                event.setCancelled(true);
+            }
+        } else {
+            plugin.getLogger().warning("Skipping block cook event for non-furnace " + event.getBlock().getType());
+        }
+    }
+
     private void applyAstralRecipes(CraftingInventory inventory, boolean canFallback) {
         AstralRecipeEvaluator evaluator = plugin.getRecipeEvaluator();
 
@@ -77,7 +128,6 @@ public class CraftingListener implements Listener {
                     new AstralShapelessRecipeStrategy()
                 );
                 break;
-
             default:
                 plugin.getLogger().warning("Skipping unsupported inventory type for crafting: " + inventory.getType());
                 return;
@@ -103,4 +153,53 @@ public class CraftingListener implements Listener {
             inventory.setResult(null);
         }
     }
+
+    private ItemStack applyAstralRecipes(FurnaceInventory inventory, boolean canFallback) {
+        AstralRecipeEvaluator evaluator = plugin.getRecipeEvaluator();
+
+        // First determine the strategies we can use
+        List<Strategy<? extends Recipe>> strategies;
+        switch (inventory.getType()) {
+            case FURNACE:
+                strategies = Lists.newArrayList(
+                        new AstralFurnaceRecipeStrategy()
+                );
+                break;
+            case BLAST_FURNACE:
+                strategies = Lists.newArrayList(
+                        new AstralBlastingRecipeStrategy()
+                );
+                break;
+            case SMOKER:
+                strategies = Lists.newArrayList(
+                        new AstralSmokingRecipeStrategy()
+                );
+                break;
+            default:
+                plugin.getLogger().warning("Skipping unsupported inventory type for smelting: " + inventory.getType());
+                return null;
+        }
+
+        // Now try to match against the recipes
+        Optional<Recipe> recipe = evaluator.matchRecipe(new ItemStack[]{inventory.getSmelting()}, strategies);
+
+        if (recipe.isPresent()) {
+
+            return recipe.get().getResult().clone();
+        } else {
+            if (canFallback) {
+                // It isn't an astral recipe, but it might still be a vanilla recipe
+                // that happens to map to the same astral recipe translation,
+                // so unfortunately we have to check that here.
+                Optional<Recipe> fallbackRecipe = evaluator.fallbackToVanilla(new ItemStack[]{inventory.getSmelting()}, strategies);
+                if (fallbackRecipe.isPresent()) {
+                    return fallbackRecipe.get().getResult().clone();
+                }
+            }
+
+            return null;
+        }
+    }
+
+
 }

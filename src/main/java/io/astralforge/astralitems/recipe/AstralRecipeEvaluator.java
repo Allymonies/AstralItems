@@ -23,6 +23,17 @@ public class AstralRecipeEvaluator {
     private Map<Class<? extends Recipe>, Set<Recipe>> recipeList = new HashMap<>();
     private Set<NamespacedKey> knownKeys = new HashSet<>();
 
+    public void registerNonVanillaRecipe(Recipe recipe) {
+        if (!(recipe instanceof Keyed)) {
+            throw new UnsupportedOperationException("Only Keyed recipes are supported at the moment");
+        }
+
+        Keyed keyedRecipe = (Keyed) recipe;
+        knownKeys.add(keyedRecipe.getKey());
+
+        recipeList.computeIfAbsent(recipe.getClass(), k -> new HashSet<Recipe>()).add(recipe);
+    }
+
     public void registerRecipe(Recipe recipe) {
         if (!(recipe instanceof Keyed)) {
             throw new UnsupportedOperationException("Only Keyed recipes are supported at the moment");

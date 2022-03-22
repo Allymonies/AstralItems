@@ -37,7 +37,7 @@ public class AstralItemListener implements Listener {
     private final AstralItems plugin;
 
     static final List<Material> PROHIBITED_INTERACTIONS = Arrays.asList(Material.COMPOSTER, Material.FARMLAND, Material.JUKEBOX, Material.LECTERN, Material.LODESTONE, Material.CAULDRON, Material.TNT, Material.GRINDSTONE, Material.FLOWER_POT);
-    static final List<InventoryType> PROHIBITED_INSERTIONS = Arrays.asList(InventoryType.STONECUTTER, InventoryType.BREWING, InventoryType.SMOKER, InventoryType.GRINDSTONE, InventoryType.LECTERN, InventoryType.BEACON, InventoryType.BLAST_FURNACE, InventoryType.CARTOGRAPHY, InventoryType.LOOM, InventoryType.FURNACE);
+    static final List<InventoryType> PROHIBITED_INSERTIONS = Arrays.asList(InventoryType.STONECUTTER, InventoryType.BREWING, InventoryType.GRINDSTONE, InventoryType.LECTERN, InventoryType.BEACON, InventoryType.CARTOGRAPHY, InventoryType.LOOM);
 
     boolean isVanillaCraftable(ItemStack item) {
         return AstralItemSpec.isVanillaCraftable(plugin, item);
@@ -217,10 +217,4 @@ public class AstralItemListener implements Listener {
             //inventory.setItem(3, null);
         }
     }
-
-    @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
-    public void onSmelt(FurnaceSmeltEvent event) {
-        event.setCancelled(true);
-    }
-
 }

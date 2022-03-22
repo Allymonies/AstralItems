@@ -3,10 +3,7 @@ package io.astralforge.astralitems.recipe;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.bukkit.inventory.Recipe;
-import org.bukkit.inventory.RecipeChoice;
-import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.inventory.*;
 
 public class AstralRecipeTranslations {
     private Map<Class<? extends Recipe>, RecipeTranslator<? extends Recipe>> recipeTranslators = new HashMap<>();
@@ -15,6 +12,10 @@ public class AstralRecipeTranslations {
     public AstralRecipeTranslations() {
         recipeTranslators.put(ShapedRecipe.class, new ShapedRecipeTranslator());
         recipeTranslators.put(ShapelessRecipe.class, new ShapelessRecipeTranslator());
+        recipeTranslators.put(FurnaceRecipe.class, new FurnaceRecipeTranslator());
+        recipeTranslators.put(BlastingRecipe.class, new BlastingRecipeTranslator());
+        recipeTranslators.put(CampfireRecipe.class, new CampfireRecipeTranslator());
+        recipeTranslators.put(SmokingRecipe.class, new SmokingRecipeTranslator());
     }
 
     public <RecipeType extends Recipe> void registerTranslator(Class<RecipeType> recipeClass, RecipeTranslator<RecipeType> recipeTranslator) {
@@ -89,6 +90,78 @@ public class AstralRecipeTranslations {
         @Override
         public Class<ShapelessRecipe> getRecipeType() {
             return ShapelessRecipe.class;
+        }
+    }
+
+    public static final class FurnaceRecipeTranslator implements RecipeTranslator<FurnaceRecipe> {
+        @Override
+        public FurnaceRecipe translateRecipe(FurnaceRecipe recipe) {
+            return new FurnaceRecipe(
+                    recipe.getKey(),
+                    recipe.getResult(),
+                    AstralRecipeChoice.translateToVanilla(recipe.getInputChoice()),
+                    recipe.getExperience(),
+                    recipe.getCookingTime()
+            );
+        }
+
+        @Override
+        public Class<FurnaceRecipe> getRecipeType() {
+            return FurnaceRecipe.class;
+        }
+    }
+
+    public static final class BlastingRecipeTranslator implements RecipeTranslator<BlastingRecipe> {
+        @Override
+        public BlastingRecipe translateRecipe(BlastingRecipe recipe) {
+            return new BlastingRecipe(
+                    recipe.getKey(),
+                    recipe.getResult(),
+                    AstralRecipeChoice.translateToVanilla(recipe.getInputChoice()),
+                    recipe.getExperience(),
+                    recipe.getCookingTime()
+            );
+        }
+
+        @Override
+        public Class<BlastingRecipe> getRecipeType() {
+            return BlastingRecipe.class;
+        }
+    }
+
+    public static final class CampfireRecipeTranslator implements RecipeTranslator<CampfireRecipe> {
+        @Override
+        public CampfireRecipe translateRecipe(CampfireRecipe recipe) {
+            return new CampfireRecipe(
+                    recipe.getKey(),
+                    recipe.getResult(),
+                    AstralRecipeChoice.translateToVanilla(recipe.getInputChoice()),
+                    recipe.getExperience(),
+                    recipe.getCookingTime()
+            );
+        }
+
+        @Override
+        public Class<CampfireRecipe> getRecipeType() {
+            return CampfireRecipe.class;
+        }
+    }
+
+    public static final class SmokingRecipeTranslator implements RecipeTranslator<SmokingRecipe> {
+        @Override
+        public SmokingRecipe translateRecipe(SmokingRecipe recipe) {
+            return new SmokingRecipe(
+                    recipe.getKey(),
+                    recipe.getResult(),
+                    AstralRecipeChoice.translateToVanilla(recipe.getInputChoice()),
+                    recipe.getExperience(),
+                    recipe.getCookingTime()
+            );
+        }
+
+        @Override
+        public Class<SmokingRecipe> getRecipeType() {
+            return SmokingRecipe.class;
         }
     }
 }

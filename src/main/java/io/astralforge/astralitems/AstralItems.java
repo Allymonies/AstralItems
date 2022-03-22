@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import io.astralforge.astralitems.block.*;
+import io.astralforge.astralitems.block.tile.AstralTileEntity;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -30,8 +31,7 @@ public class AstralItems extends JavaPlugin {
     private AstralRecipeEvaluator recipeEvaluator;
 
     public static AstralItems getInstance() {
-        return Bukkit.getPluginManager().getPlugin("AstralItems") instanceof AstralItems 
-            ? (AstralItems) Bukkit.getPluginManager().getPlugin("AstralItems") : null;
+        return (AstralItems) Bukkit.getPluginManager().getPlugin("AstralItems");
     }
 
     @Override
@@ -76,6 +76,7 @@ public class AstralItems extends JavaPlugin {
     public void onDisable() {
         //Fired when the server stops and disables all plugins
         recipeEvaluator.unregisterAllRecipes();
+        basicBlockStateManager.unloadAllTileEntities();
     }
 
     private void hydrate() {
@@ -173,6 +174,11 @@ public class AstralItems extends JavaPlugin {
     public AbstractAstralBlockSpec getAstralBlock(NamespacedKey id) {
         if (blocks.containsKey(id)) return blocks.get(id);
         return createPlaceholderBlock(id, getAstralItem(id));
+    }
+
+    public Optional<AstralTileEntity> getTileEntity(Block block) {
+        if (block == null) return Optional.empty();
+        return basicBlockStateManager.getTileEntityFromBlock(block);
     }
 
     public Map<NamespacedKey,AstralItemSpec> getItems() {

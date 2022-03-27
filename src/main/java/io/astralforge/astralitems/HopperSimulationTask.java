@@ -95,7 +95,7 @@ public class HopperSimulationTask implements Runnable {
                         if (extractionBlock.getType() != Material.AIR) {
                             Optional<AstralTileEntity> optTileEntity = plugin.getTileEntity(extractionBlock);
                             if (optTileEntity.isPresent()) {
-                                didOperation = didOperation || processExtraction(hopper, hopperAmount, optTileEntity.get(), sourceBlockFace);
+                                didOperation = didOperation || processExtraction(hopper, hopperAmount, optTileEntity.get(), BlockFace.DOWN);
                             }
                         }
 

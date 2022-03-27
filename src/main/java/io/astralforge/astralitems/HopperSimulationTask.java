@@ -46,6 +46,7 @@ public class HopperSimulationTask implements Runnable {
         cacheCounter++;
         if (cacheCounter >= hopperCacheDuration) {
             cacheCounter = 0;
+            hopperCache.clear();
             Bukkit.getServer().getWorlds().forEach(world -> {
                 int ticksPerHopperTransfer = Bukkit.spigot().getConfig().getInt("world-settings.default.ticks-per.hopper-transfer", 8);
                 int hopperAmount = Bukkit.spigot().getConfig().getInt("world-settings.default.hopper-amount", 1);
@@ -70,6 +71,7 @@ public class HopperSimulationTask implements Runnable {
 
         for (Hopper hopper : hopperCache) {
             if (dedupeHoppers.contains(hopper)) continue;
+            if (hopper.getBlock().getType() != Material.HOPPER) continue;
             BlockData blockData = hopper.getBlockData();
             if (!blockData.matches(enabledHopper)) {
                 // Hopper is disabled, don't need to simulate it

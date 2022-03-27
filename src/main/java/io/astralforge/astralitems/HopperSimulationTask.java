@@ -132,6 +132,7 @@ public class HopperSimulationTask implements Runnable {
         for (int i = 0; i < hopper.getInventory().getSize(); i++) {
             ItemStack itemStack = hopper.getInventory().getItem(i);
             if (itemStack == null || itemStack.getAmount() == 0) continue;
+            itemStack = itemStack.clone();
             int remainderAmount = 0;
             if (itemStack.getAmount() > hopperAmount) {
                 remainderAmount = itemStack.getAmount() - hopperAmount;

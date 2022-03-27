@@ -1,12 +1,15 @@
 package io.astralforge.astralitems.recipe;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
 import com.google.common.collect.Lists;
 
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.block.Furnace;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -14,7 +17,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockCookEvent;
 import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.inventory.FurnaceStartSmeltEvent;
-import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.FurnaceInventory;
@@ -25,11 +27,25 @@ import io.astralforge.astralitems.AstralItemSpec;
 import io.astralforge.astralitems.AstralItems;
 import io.astralforge.astralitems.recipe.AstralRecipeEvaluator.Strategy;
 import lombok.AllArgsConstructor;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.scheduler.BukkitRunnable;
 
-@AllArgsConstructor
 public class CraftingListener implements Listener {
 
     private AstralItems plugin;
+    private final Integer cacheDuration = 60 * 20;
+    private final HashMap<Location, ItemStack> unsmeltableCache = new HashMap<>();
+
+    public CraftingListener(AstralItems plugin) {
+        this.plugin = plugin;
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                unsmeltableCache.clear();
+            }
+        }.runTaskTimer(plugin, cacheDuration, cacheDuration);
+    }
 
     boolean isVanillaCraftable(ItemStack item) {
         return AstralItemSpec.isVanillaCraftable(plugin, item);
@@ -82,11 +98,24 @@ public class CraftingListener implements Listener {
     public void onFurnaceBurn(FurnaceBurnEvent event) {
         Furnace furnace = (Furnace) event.getBlock().getState();
         FurnaceInventory inventory = furnace.getInventory();
+        ItemStack smeltingItem = furnace.getInventory().getSmelting();
+        if (smeltingItem != null) {
+            ItemStack cachedUnsmeltable = unsmeltableCache.get(event.getBlock().getLocation());
+            if (cachedUnsmeltable != null && cachedUnsmeltable.equals(smeltingItem)) {
+                // We have already determined this item is unsmeltable
+                event.setCancelled(true);
+                return;
+            }
+        }
         boolean vanillaCraftable = isVanillaCraftable(inventory.getSmelting());
         ItemStack result = applyAstralRecipes(furnace.getInventory(), vanillaCraftable);
 
         if (result == null) {
             // No recipe was found, we need to try and prevent the furnace burn
+            if (smeltingItem != null) {
+                // Remember that this item is unsmeltable
+                unsmeltableCache.put(event.getBlock().getLocation(), smeltingItem);
+            }
             event.setCancelled(true);
         }
     }
@@ -99,7 +128,6 @@ public class CraftingListener implements Listener {
             boolean vanillaCraftable = isVanillaCraftable(inventory.getSmelting());
             ItemStack result = applyAstralRecipes(furnace.getInventory(), vanillaCraftable);
             if (result != null) {
-                plugin.getLogger().info("Block cook for " + result.getType().name());
                 event.setResult(result);
             } else {
                 event.setCancelled(true);

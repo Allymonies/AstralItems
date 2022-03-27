@@ -16,6 +16,7 @@ import org.bukkit.block.Hopper;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Optional;
@@ -28,8 +29,13 @@ public class HopperSimulationTask implements Runnable {
     private final BlockData westHopper = Bukkit.getServer().createBlockData("minecraft:hopper[facing=west]");
     private final BlockData northHopper = Bukkit.getServer().createBlockData("minecraft:hopper[facing=north]");
     private final BlockData southHopper = Bukkit.getServer().createBlockData("minecraft:hopper[facing=south]");
+    private final int hopperCacheDuration = 20 * 5; // 5 Seconds
+    private int cacheCounter = hopperCacheDuration;
     private AstralItems plugin;
     private HashSet<Hopper> dedupeHoppers = new HashSet<>();
+    private ArrayList<Hopper> hopperCache = new ArrayList<>();
+    private HashMap<World, Integer> worldTicksPerTransfer = new HashMap<>();
+    private HashMap<World, Integer> worldHopperAmount = new HashMap<>();
 
     HopperSimulationTask(AstralItems plugin) {
         this.plugin = plugin;
@@ -37,87 +43,96 @@ public class HopperSimulationTask implements Runnable {
 
     @Override
     public void run() {
-        Bukkit.getServer().getWorlds().forEach(world -> {
-            int ticksPerHopperTransfer = Bukkit.spigot().getConfig().getInt("world-settings.default.ticks-per.hopper-transfer", 8);
-            int hopperAmount = Bukkit.spigot().getConfig().getInt("world-settings.default.hopper-amount", 1);
-            if (Bukkit.spigot().getConfig().contains("world-settings." + world.getName() + ".ticks-per.hopper-transfer")) {
-                ticksPerHopperTransfer = Bukkit.spigot().getConfig().getInt("world-settings." + world.getName() + ".ticks-per.hopper-transfer", 8);
+        cacheCounter++;
+        if (cacheCounter >= hopperCacheDuration) {
+            cacheCounter = 0;
+            Bukkit.getServer().getWorlds().forEach(world -> {
+                int ticksPerHopperTransfer = Bukkit.spigot().getConfig().getInt("world-settings.default.ticks-per.hopper-transfer", 8);
+                int hopperAmount = Bukkit.spigot().getConfig().getInt("world-settings.default.hopper-amount", 1);
+                if (Bukkit.spigot().getConfig().contains("world-settings." + world.getName() + ".ticks-per.hopper-transfer")) {
+                    ticksPerHopperTransfer = Bukkit.spigot().getConfig().getInt("world-settings." + world.getName() + ".ticks-per.hopper-transfer", 8);
+                }
+                if (Bukkit.spigot().getConfig().contains("world-settings." + world.getName() + ".hopper-amount")) {
+                    hopperAmount = Bukkit.spigot().getConfig().getInt("world-settings." + world.getName() + ".hopper-amount", 1);
+                }
+                worldTicksPerTransfer.put(world, ticksPerHopperTransfer);
+                worldHopperAmount.put(world, hopperAmount);
+
+                for (Chunk chunk : world.getLoadedChunks()) {
+                    for (BlockState tileEntity : chunk.getTileEntities()) {
+                        if (tileEntity instanceof Hopper) {
+                            hopperCache.add((Hopper) tileEntity);
+                        }
+                    }
+                }
+            });
+        }
+
+        for (Hopper hopper : hopperCache) {
+            if (dedupeHoppers.contains(hopper)) continue;
+            BlockData blockData = hopper.getBlockData();
+            if (!blockData.matches(enabledHopper)) {
+                // Hopper is disabled, don't need to simulate it
+                continue;
             }
-            if (Bukkit.spigot().getConfig().contains("world-settings." + world.getName() + ".hopper-amount")) {
-                hopperAmount = Bukkit.spigot().getConfig().getInt("world-settings." + world.getName() + ".hopper-amount", 1);
+            NBTTileEntity hopperNBT = new NBTTileEntity(hopper);
+
+            Integer transferCooldown = hopperNBT.getInteger("TransferCooldown");
+
+            if (transferCooldown > 1) {
+                // Hopper isn't ready to transfer yet
+                continue;
             }
 
-            for (Chunk chunk : world.getLoadedChunks()) {
-                for (BlockState tileEntity : chunk.getTileEntities()) {
-                    if (tileEntity instanceof Hopper) {
-                        Hopper hopper = (Hopper) tileEntity;
-                        if (dedupeHoppers.contains(hopper)) continue;
-                        BlockData blockData = hopper.getBlockData();
-                        if (!blockData.matches(enabledHopper)) {
-                            // Hopper is disabled, don't need to simulate it
-                            continue;
-                        }
-                        NBTTileEntity hopperNBT = new NBTTileEntity(hopper);
+            Block destinationBlock = null;
+            BlockFace sourceBlockFace = null;
+            if (blockData.matches(downHopper)) {
+                destinationBlock = hopper.getLocation().add(0, -1, 0).getBlock();
+                sourceBlockFace = BlockFace.UP;
+            } else if (blockData.matches(eastHopper)) {
+                destinationBlock = hopper.getLocation().add(1, 0, 0).getBlock();
+                sourceBlockFace = BlockFace.WEST;
+            } else if (blockData.matches(westHopper)) {
+                destinationBlock = hopper.getLocation().add(-1, 0, 0).getBlock();
+                sourceBlockFace = BlockFace.EAST;
+            } else if (blockData.matches(northHopper)) {
+                destinationBlock = hopper.getLocation().add(0, 0, -1).getBlock();
+                sourceBlockFace = BlockFace.SOUTH;
+            } else if (blockData.matches(southHopper)) {
+                destinationBlock = hopper.getLocation().add(0, 0, 1).getBlock();
+                sourceBlockFace = BlockFace.NORTH;
+            }
 
-                        Integer transferCooldown = hopperNBT.getInteger("TransferCooldown");
+            boolean didOperation = false;
 
-                        if (transferCooldown > 1) {
-                            // Hopper isn't ready to transfer yet
-                            continue;
-                        }
+            if (destinationBlock != null) {
+                Optional<AstralTileEntity> optTileEntity = plugin.getTileEntity(destinationBlock);
+                if (optTileEntity.isPresent()) {
+                    didOperation = processInsertion(hopper, worldHopperAmount.get(hopper.getWorld()), optTileEntity.get(), sourceBlockFace);
+                }
+            }
 
-                        Block destinationBlock = null;
-                        BlockFace sourceBlockFace = null;
-                        if (blockData.matches(downHopper)) {
-                            destinationBlock = hopper.getLocation().add(0, -1, 0).getBlock();
-                            sourceBlockFace = BlockFace.UP;
-                        } else if (blockData.matches(eastHopper)) {
-                            destinationBlock = hopper.getLocation().add(1, 0, 0).getBlock();
-                            sourceBlockFace = BlockFace.WEST;
-                        } else if (blockData.matches(westHopper)) {
-                            destinationBlock = hopper.getLocation().add(-1, 0, 0).getBlock();
-                            sourceBlockFace = BlockFace.EAST;
-                        } else if (blockData.matches(northHopper)) {
-                            destinationBlock = hopper.getLocation().add(0, 0, -1).getBlock();
-                            sourceBlockFace = BlockFace.SOUTH;
-                        } else if (blockData.matches(southHopper)) {
-                            destinationBlock = hopper.getLocation().add(0, 0, 1).getBlock();
-                            sourceBlockFace = BlockFace.NORTH;
-                        }
+            Block extractionBlock = hopper.getLocation().add(0, 1, 0).getBlock();
+            if (extractionBlock.getType() != Material.AIR) {
+                Optional<AstralTileEntity> optTileEntity = plugin.getTileEntity(extractionBlock);
+                if (optTileEntity.isPresent()) {
+                    didOperation = didOperation || processExtraction(hopper, worldHopperAmount.get(hopper.getWorld()), optTileEntity.get(), BlockFace.DOWN);
+                }
+            }
 
-                        boolean didOperation = false;
-
-                        if (destinationBlock != null) {
-                            Optional<AstralTileEntity> optTileEntity = plugin.getTileEntity(destinationBlock);
-                            if (optTileEntity.isPresent()) {
-                                didOperation = processInsertion(hopper, hopperAmount, optTileEntity.get(), sourceBlockFace);
-                            }
-                        }
-
-                        Block extractionBlock = hopper.getLocation().add(0, 1, 0).getBlock();
-                        if (extractionBlock.getType() != Material.AIR) {
-                            Optional<AstralTileEntity> optTileEntity = plugin.getTileEntity(extractionBlock);
-                            if (optTileEntity.isPresent()) {
-                                didOperation = didOperation || processExtraction(hopper, hopperAmount, optTileEntity.get(), BlockFace.DOWN);
-                            }
-                        }
-
-                        if (didOperation) {
-                            int finalTicksPerHopperTransfer = ticksPerHopperTransfer;
-                            dedupeHoppers.add(hopper);
-                            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                                dedupeHoppers.remove(hopper);
-                                hopperNBT.setInteger("TransferCooldown", finalTicksPerHopperTransfer);
-                            }, 1);
-                        }
+            if (didOperation) {
+                int finalTicksPerHopperTransfer = worldTicksPerTransfer.get(hopper.getWorld());
+                dedupeHoppers.add(hopper);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    dedupeHoppers.remove(hopper);
+                    hopperNBT.setInteger("TransferCooldown", finalTicksPerHopperTransfer);
+                }, 1);
+            }
 
 
-                        //Bukkit.getLogger().info("Hopper reader for transfer at " + hopper.getLocation().toString());
-                        //hopperNBT.setInteger("TransferCooldown", ticksPerHopperTransfer + 1);
-                   }
-               }
-           }
-        });
+            //Bukkit.getLogger().info("Hopper reader for transfer at " + hopper.getLocation().toString());
+            //hopperNBT.setInteger("TransferCooldown", ticksPerHopperTransfer + 1);
+        }
     }
 
     public boolean processInsertion(Hopper hopper, int hopperAmount, AstralTileEntity astralTileEntity, BlockFace face) {

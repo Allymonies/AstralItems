@@ -101,9 +101,9 @@ public class HopperSimulationTask implements Runnable {
 
                         if (didOperation) {
                             int finalTicksPerHopperTransfer = ticksPerHopperTransfer;
-                            Bukkit.getScheduler().runTask(plugin, () -> {
+                            Bukkit.getScheduler().runTaskLater(plugin, () -> {
                                 hopperNBT.setInteger("TransferCooldown", finalTicksPerHopperTransfer);
-                            });
+                            }, 1);
                         }
 
 

@@ -1,5 +1,6 @@
 package io.astralforge.astralitems.block.tile;
 
+import org.bukkit.Bukkit;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -114,9 +115,9 @@ public class MappedInventoryItemHandler implements ItemHandler {
     public ItemStack insertItem(ItemStack item) {
         ItemStack leftover = item.clone();
         for (int i = 0; i < slots.size(); i++) {
-            ItemStack insertLeftover = insertItem(i, item);
+            ItemStack insertLeftover = insertItem(i, leftover);
             if (insertLeftover != null) {
-                leftover.setAmount(leftover.getAmount() - insertLeftover.getAmount());
+                leftover = insertLeftover;
             }
             if (insertLeftover == null || leftover.getAmount() == 0) return null;
         }

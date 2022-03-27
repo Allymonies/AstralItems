@@ -17,6 +17,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Optional;
 
 public class HopperSimulationTask implements Runnable {
@@ -28,6 +29,7 @@ public class HopperSimulationTask implements Runnable {
     private final BlockData northHopper = Bukkit.getServer().createBlockData("minecraft:hopper[facing=north]");
     private final BlockData southHopper = Bukkit.getServer().createBlockData("minecraft:hopper[facing=south]");
     private AstralItems plugin;
+    private HashSet<Hopper> dedupeHoppers = new HashSet<>();
 
     HopperSimulationTask(AstralItems plugin) {
         this.plugin = plugin;
@@ -49,6 +51,7 @@ public class HopperSimulationTask implements Runnable {
                 for (BlockState tileEntity : chunk.getTileEntities()) {
                     if (tileEntity instanceof Hopper) {
                         Hopper hopper = (Hopper) tileEntity;
+                        if (dedupeHoppers.contains(hopper)) continue;
                         BlockData blockData = hopper.getBlockData();
                         if (!blockData.matches(enabledHopper)) {
                             // Hopper is disabled, don't need to simulate it
@@ -101,7 +104,9 @@ public class HopperSimulationTask implements Runnable {
 
                         if (didOperation) {
                             int finalTicksPerHopperTransfer = ticksPerHopperTransfer;
+                            dedupeHoppers.add(hopper);
                             Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                dedupeHoppers.remove(hopper);
                                 hopperNBT.setInteger("TransferCooldown", finalTicksPerHopperTransfer);
                             }, 1);
                         }

@@ -1,15 +1,21 @@
 package io.astralforge.astralitems.block;
 
+import java.util.ArrayList;
 import java.util.Optional;
 
 import io.astralforge.astralitems.block.tile.AstralTileEntity;
 import org.bukkit.GameMode;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.data.type.Piston;
+import org.bukkit.block.data.type.TechnicalPiston;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
@@ -35,10 +41,10 @@ public class BasicBlockEventListener implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         //plugin.getLogger().info("Block break event for " + event.getBlock().getLocation().toString());
         BlockState state = event.getBlock().getState();
-        Optional<AbstractAstralBlockSpec> spec = basicBlockStateManager.processBlockRemoval(state);
-        if (spec.isPresent() && spec.get() instanceof AstralPlaceholderBlockSpec) {
+        Optional<AstralBlock> astralBlock = basicBlockStateManager.processBlockRemoval(state);
+        if (astralBlock.isPresent() && astralBlock.get().blockSpec instanceof AstralPlaceholderBlockSpec) {
             event.setCancelled(true);
-            BaseComponent[] message = new ComponentBuilder(spec.get().itemSpec.id.toString())
+            BaseComponent[] message = new ComponentBuilder(astralBlock.get().blockSpec.itemSpec.id.toString())
                 .color(ChatColor.GRAY)
                 .append(" at ").color(ChatColor.RED)
                 .append(event.getBlock().getX() + " " + event.getBlock().getY() + " " + event.getBlock().getZ()).color(ChatColor.GRAY)
@@ -46,8 +52,8 @@ public class BasicBlockEventListener implements Listener {
                 .color(ChatColor.RED)
                 .create();
             event.getPlayer().spigot().sendMessage(message);
-        } else if (spec.isPresent() && event.isDropItems() && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
-            ItemStack item = spec.get().itemSpec.createItemStack();
+        } else if (astralBlock.isPresent() && event.isDropItems() && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
+            ItemStack item = astralBlock.get().blockSpec.itemSpec.createItemStack();
             event.setDropItems(false); // To prevent sync issues with ChunkStorage
             state.getWorld().dropItemNaturally(state.getLocation(), item);
         }
@@ -82,6 +88,44 @@ public class BasicBlockEventListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST) // Listening for the event.
     public void onChunkUnload(ChunkUnloadEvent event) {
         basicBlockStateManager.unloadChunkTileEntities(event.getChunk());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST) // Listening for the event.
+    public void onPistonExtend(BlockPistonExtendEvent event) {
+        Piston piston = (Piston) event.getBlock().getBlockData();
+        BlockFace face = piston.getFacing();
+        ArrayList<AstralBlock> astralBlocks = new ArrayList<>();
+        for (Block block : event.getBlocks()) {
+            Optional<AstralBlock> optAstralBlock = basicBlockStateManager.processBlockRemoval(block.getState());
+            optAstralBlock.ifPresent(astralBlocks::add);
+        }
+        for (AstralBlock astralBlock : astralBlocks) {
+            Block targetBlock = astralBlock.blockLocation.add(face.getDirection()).getBlock();
+            if (astralBlock.blockSpec instanceof AstralBasicBlockSpec) {
+                basicBlockStateManager.processBlockPlacement((AstralBasicBlockSpec) astralBlock.blockSpec, targetBlock, astralBlock.data);
+            } else if (astralBlock.blockSpec instanceof AstralPlaceholderBlockSpec) {
+                basicBlockStateManager.processBlockPlacement((AstralPlaceholderBlockSpec) astralBlock.blockSpec, targetBlock, astralBlock.data);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST) // Listening for the event.
+    public void onPistonRetract(BlockPistonRetractEvent event) {
+        TechnicalPiston piston = (TechnicalPiston) event.getBlock().getBlockData();
+        BlockFace face = piston.getFacing().getOppositeFace();
+        ArrayList<AstralBlock> astralBlocks = new ArrayList<>();
+        for (Block block : event.getBlocks()) {
+            Optional<AstralBlock> optAstralBlock = basicBlockStateManager.processBlockRemoval(block.getState());
+            optAstralBlock.ifPresent(astralBlocks::add);
+        }
+        for (AstralBlock astralBlock : astralBlocks) {
+            Block targetBlock = astralBlock.blockLocation.add(face.getDirection()).getBlock();
+            if (astralBlock.blockSpec instanceof AstralBasicBlockSpec) {
+                basicBlockStateManager.processBlockPlacement((AstralBasicBlockSpec) astralBlock.blockSpec, targetBlock, astralBlock.data);
+            } else if (astralBlock.blockSpec instanceof AstralPlaceholderBlockSpec) {
+                basicBlockStateManager.processBlockPlacement((AstralPlaceholderBlockSpec) astralBlock.blockSpec, targetBlock, astralBlock.data);
+            }
+        }
     }
     
 }

@@ -129,10 +129,9 @@ public class BasicBlockStateManager {
         }
     }
 
-    public void processBlockPlacement(AstralBasicBlockSpec spec, Block block) {
+    private void processInternalBlockPlacement(AbstractAstralBlockSpec spec, Block block, PersistentDataContainer data) {
         ChunkAstralBlock meta = new ChunkAstralBlock(spec.itemSpec.id, new byte[0]);
-        PersistentDataContainer data = null;
-        if (spec.tileEntityBuilder != null) {
+        if (spec.tileEntityBuilder != null && data == null) {
             data = chunkStorage.getAdapterContext(block.getChunk()).newPersistentDataContainer();
         }
         AstralBlock astralBlock = new AstralBlock(spec, block.getLocation(), data);
@@ -141,6 +140,22 @@ public class BasicBlockStateManager {
         if (spec.tileEntityBuilder != null) {
             loadTileEntity(block, astralBlock);
         }
+    }
+
+    public void processBlockPlacement(AstralBasicBlockSpec spec, Block block, PersistentDataContainer data) {
+        processInternalBlockPlacement(spec, block, data);
+    }
+
+    public void processBlockPlacement(AstralBasicBlockSpec spec, Block block) {
+        processInternalBlockPlacement(spec, block, null);
+    }
+
+    public void processBlockPlacement(AstralPlaceholderBlockSpec spec, Block block, PersistentDataContainer data) {
+        processInternalBlockPlacement(spec, block, data);
+    }
+
+    public void processBlockPlacement(AstralPlaceholderBlockSpec spec, Block block) {
+        processInternalBlockPlacement(spec, block, null);
     }
 
     public Optional<AbstractAstralBlockSpec> getSpecFromBlock(Block block) {
@@ -181,18 +196,18 @@ public class BasicBlockStateManager {
         return Optional.empty();
     }
     
-    public Optional<AbstractAstralBlockSpec> processBlockRemoval(BlockState blockState) {
-        Optional<AstralBlock> astralBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
-        if (astralBlock.isPresent()) {
-
-            AbstractAstralBlockSpec spec = astralBlock.get().blockSpec;
+    public Optional<AstralBlock> processBlockRemoval(BlockState blockState) {
+        Optional<AstralBlock> optAstralBlock = chunkStorage.getMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
+        if (optAstralBlock.isPresent()) {
+            AstralBlock astralBlock = optAstralBlock.get();
+            AbstractAstralBlockSpec spec = astralBlock.blockSpec;
             if (spec instanceof AstralBasicBlockSpec) {
                 chunkStorage.removeMeta(blockState.getChunk(), blockState.getX(), blockState.getY(), blockState.getZ());
 //                tickCache.remove(blockState.getBlock());
-                unloadTileEntity(astralBlock.get());
-                return Optional.of(spec);
+                unloadTileEntity(astralBlock);
+                return Optional.of(astralBlock);
             } else if (spec instanceof AstralPlaceholderBlockSpec) {
-                return Optional.of(spec);
+                return Optional.of(astralBlock);
             }
         }
 

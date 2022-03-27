@@ -55,6 +55,8 @@ public class AstralItems extends JavaPlugin {
         BasicBlockEventListener blockEventListener = new BasicBlockEventListener(this, basicBlockStateManager);
         getServer().getPluginManager().registerEvents(blockEventListener, this);
 
+        getServer().getPluginManager().registerEvents(new ItemTransferListener(), this);
+
         GiveCommand giveCommand = new GiveCommand(this);
         getCommand("giveai").setExecutor(giveCommand);
 
@@ -64,6 +66,7 @@ public class AstralItems extends JavaPlugin {
         //FileConfiguration config = this.getConfig();
         hydrate();
         getLogger().info("AstralItems running!");
+        getServer().getScheduler().runTaskTimer(this, new HopperSimulationTask(this),1,1);
         //Fired when the server enables the plugin
         /*CommandPK commandPK = new CommandPK(data, this);
         this.getCommand("pk").setExecutor(commandPK);

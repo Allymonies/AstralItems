@@ -53,11 +53,13 @@ public class BasicBlockEventListener implements Listener {
                 .color(ChatColor.RED)
                 .create();
             event.getPlayer().spigot().sendMessage(message);
-        } else if (astralBlock.isPresent() && event.isDropItems() && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
-            ItemStack item = astralBlock.get().blockSpec.itemSpec.createItemStack();
+        } else if (astralBlock.isPresent()) {
             tileEntity.ifPresent(AstralTileEntity::onDestroy);
-            event.setDropItems(false); // To prevent sync issues with ChunkStorage
-            state.getWorld().dropItemNaturally(state.getLocation(), item);
+            if (event.isDropItems() && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
+                ItemStack item = astralBlock.get().blockSpec.itemSpec.createItemStack();
+                event.setDropItems(false); // To prevent sync issues with ChunkStorage
+                state.getWorld().dropItemNaturally(state.getLocation(), item);
+            }
         }
     }
 
